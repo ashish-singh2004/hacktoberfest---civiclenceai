@@ -40,7 +40,7 @@ def test_missing_api_key_raises_error():
     img = Image.new("RGB", (400, 300), color="white")
     with pytest.raises(GemmaAPIError) as exc_info:
         analyze_street_image(img, api_key="", force_demo_mode=False)
-    assert "Missing GEMMA_API_KEY" in str(exc_info.value)
+    assert "Missing API Key" in str(exc_info.value)
 
 
 def test_force_demo_mode_returns_labeled_demo_result():

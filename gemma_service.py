@@ -122,10 +122,10 @@ def analyze_street_image(
         image = image.convert("RGB")
 
     # 3. Resolve API Key & Model
-    resolved_api_key = api_key or os.getenv("GEMMA_API_KEY")
+    resolved_api_key = api_key or os.getenv("GEMMA_API_KEY") or os.getenv("GEMINI_API_KEY")
     if not resolved_api_key or resolved_api_key.strip() in ("", "your_gemini_or_gemma_api_key_here"):
         raise GemmaAPIError(
-            "Missing GEMMA_API_KEY. Please provide a valid Google AI Studio / Gemma API key in "
+            "Missing API Key. Please provide your Google AI Studio API key (GEMMA_API_KEY or GEMINI_API_KEY) in "
             "the sidebar settings or in your local .env file."
         )
 
