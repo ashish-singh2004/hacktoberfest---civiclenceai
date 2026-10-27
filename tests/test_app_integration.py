@@ -29,5 +29,5 @@ def test_demo_cases_integration():
             assert draft.priority_score == issue.priority_breakdown.total_score
 
             txt = export_report_as_text(draft)
-            assert "CIVIC ACCESSIBILITY AUDIT" in txt
+            assert "CIVIC ROAD & FOOTPATH REPAIR REQUEST" in txt
             assert "Test Location" in txt

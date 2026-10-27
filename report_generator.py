@@ -1,61 +1,114 @@
 """
 CivicLens AI - Civic Complaint Report Draft Generator
-Formats audit observations into formal, evidence-backed civic complaint drafts
-intended for voluntary citizen review and submission to municipal authorities.
+Formats audit observations into simple, citizen-friendly complaint drafts
+with automated municipal department routing and 1-click WhatsApp/Email sharing.
 
 NON-NEGOTIABLE PRINCIPLES:
 - Never claim the complaint has been submitted to authorities. Draft only.
 - Never invent GPS coordinates, street addresses, or legal statutes.
 - User-provided location is labeled transparently.
-- Supports bilingual English & Hindi formatting.
+- Plain, conversational, jargon-free English and Hindi.
 - Exportable to clean Markdown, TXT, and JSON.
 """
 
 import json
+import urllib.parse
 from datetime import datetime
 from typing import Optional, Dict
 from schemas import AuditAnalysisResult, AccessibilityIssue, CivicReportDraft
 
 
-# Bilingual template dictionaries
-TEMPLATES: Dict[str, Dict[str, str]] = {
-    "en": {
-        "header": "CIVIC ACCESSIBILITY AUDIT - COMPLAINT DRAFT",
-        "sub_header": "Prepared via CivicLens AI (Evidence-Based Assistive Audit)",
-        "disclaimer": (
-            "NOTICE: This document is an assistive civic draft intended for review and voluntary submission "
-            "by a resident. It does NOT constitute a legally binding inspection, an official municipal citation, "
-            "or an automated government filing. No personal identities or biometric profiles are included."
-        ),
-        "location_label": "Reported Location (Citizen-Provided)",
-        "issue_label": "Identified Barrier Category",
-        "condition_label": "Observed Physical Condition",
-        "evidence_label": "Photographic Visual Evidence",
-        "impact_label": "Possible Pedestrian & Mobility Impact",
-        "remediation_label": "Recommended Civic Action",
-        "priority_label": "Suggested Priority Rating",
-        "uncertainties_label": "Uncertainties & On-Site Verification Requirements",
-        "audit_meta_label": "Audit Session Reference",
+# Department routing map
+DEPARTMENT_ROUTING = {
+    "open_drainage_pothole": {
+        "en": "Public Works Department (PWD) / Municipal Road Maintenance Division",
+        "hi": "लोक निर्माण विभाग (PWD) / सड़क मरम्मत शाखा"
     },
-    "hi": {
-        "header": "नागरिक सुगमता ऑडिट - शिकायत मसौदा",
-        "sub_header": "CivicLens AI द्वारा तैयार (साक्ष्य-आधारित सहायक ऑडिट)",
-        "disclaimer": (
-            "सूचना: यह दस्तावेज़ नागरिक द्वारा समीक्षा और स्वैच्छिक शिकायत दर्ज करने हेतु एक सहायक मसौदा है। "
-            "यह कोई आधिकारिक सरकारी नोटिस या स्वतः जमा की गई शिकायत नहीं है। इसमें किसी व्यक्ति की पहचान या "
-            "बायोमेट्रिक डेटा शामिल नहीं है।"
-        ),
-        "location_label": "दर्ज किया गया स्थान (नागरिक द्वारा प्रदत्त)",
-        "issue_label": "पहचाने गए अवरोध की श्रेणी",
-        "condition_label": "प्रत्यक्ष भौतिक स्थिति",
-        "evidence_label": "तस्वीर से प्राप्त दृश्य साक्ष्य",
-        "impact_label": "पैदल यात्रियों और दिव्यांगजनों पर संभावित प्रभाव",
-        "remediation_label": "सुझाया गया सुधारात्मक कार्य",
-        "priority_label": "प्रस्तावित प्राथमिकता स्तर",
-        "uncertainties_label": "अनिश्चितताएं एवं भौतिक सत्यापन आवश्यकताएं",
-        "audit_meta_label": "ऑडिट सत्र संदर्भ",
+    "collapsed_slab": {
+        "en": "Public Works Department (PWD) / Civil Infrastructure Wing",
+        "hi": "लोक निर्माण विभाग (PWD) / सिविल निर्माण शाखा"
+    },
+    "broken_footpath": {
+        "en": "Municipal Corporation - Footpath & Pedestrian Infrastructure Cell",
+        "hi": "नगर निगम - फुटपाथ एवं पैदल मार्ग सुधार शाखा"
+    },
+    "standing_water": {
+        "en": "City Jal Board & Stormwater Drainage Department",
+        "hi": "जल बोर्ड एवं जल-निकासी (ड्रेनेज) विभाग"
+    },
+    "damaged_walking_surface": {
+        "en": "Ward Maintenance Engineer / Municipal Corporation",
+        "hi": "वार्ड अनुरक्षण इंजीनियर / नगर पालिका परिषद"
+    },
+    "encroachment_obstacle": {
+        "en": "Municipal Encroachment Cell & Traffic Police",
+        "hi": "अतिक्रमण निरोधक दस्ता एवं यातायात पुलिस"
+    },
+    "missing_ramp": {
+        "en": "Urban Development Authority - Barrier-Free Accessibility Division",
+        "hi": "शहरी विकास प्राधिकरण - सुगम भारत / दिव्यांगजन सेल"
+    },
+    "waste_overflow": {
+        "en": "Solid Waste Management & Sanitation Department",
+        "hi": "ठोस अपशिष्ट प्रबंधन एवं स्वच्छता विभाग"
+    },
+    "vegetation_overgrowth": {
+        "en": "Municipal Horticulture Department",
+        "hi": "उद्यान एवं बागवानी विभाग"
+    },
+    "no_barrier_detected": {
+        "en": "Municipal Maintenance Wing (Routine Sweeping)",
+        "hi": "नियमित सफाई एवं रखरखाव शाखा"
     }
 }
+
+# Simplified Bilingual Template Dictionaries
+TEMPLATES: Dict[str, Dict[str, str]] = {
+    "en": {
+        "header": "CIVIC ROAD & FOOTPATH REPAIR REQUEST",
+        "sub_header": "Prepared via CivicLens AI (Citizen Accessibility Audit)",
+        "disclaimer": (
+            "NOTE: This is an editable citizen complaint letter prepared for your review and voluntary submission "
+            "to your local ward office, municipal corporation, or PWD. No personal faces or private data are recorded."
+        ),
+        "location_label": "Problem Location",
+        "issue_label": "Identified Hazard",
+        "condition_label": "What is the problem on the street?",
+        "evidence_label": "What was seen in the photo?",
+        "impact_label": "Who is impacted? (Wheelchair, Elderly, Children)",
+        "remediation_label": "What action is requested?",
+        "authority_label": "Responsible Municipal Department",
+        "priority_label": "Urgency Level",
+        "uncertainties_label": "Things needing in-person check",
+        "audit_meta_label": "Audit ID",
+    },
+    "hi": {
+        "header": "नागरिक सड़क एवं फुटपाथ मरम्मत अनुरोध पत्र",
+        "sub_header": "CivicLens AI द्वारा तैयार (नागरिक सुगमता रिपोर्ट)",
+        "disclaimer": (
+            "नोट: यह एक तैयार शिकायत पत्र है जिसे आप अपने वार्ड पार्षद, नगर निगम या PWD अधिकारी को भेज सकते हैं। "
+            "इसमें किसी व्यक्ति की फोटो या निजी जानकारी शामिल नहीं है।"
+        ),
+        "location_label": "समस्या का स्थान",
+        "issue_label": "सड़क/फुटपाथ की समस्या",
+        "condition_label": "रास्ते पर क्या खराबी है?",
+        "evidence_label": "तस्वीर में क्या दिखा?",
+        "impact_label": "किन लोगों को आने-जाने में परेशानी होगी?",
+        "remediation_label": "प्रशासन से क्या सुधार अनुरोध है?",
+        "authority_label": "जिम्मेदार सरकारी विभाग",
+        "priority_label": "खतरे की गंभीरता (Priority)",
+        "uncertainties_label": "मौके पर जांच करने योग्य बातें",
+        "audit_meta_label": "ऑडिट संदर्भ संख्या",
+    }
+}
+
+
+def get_responsible_authority(issue_type: str, language: str = "en") -> str:
+    """Returns the most appropriate municipal department for an issue."""
+    key = issue_type.lower().strip()
+    lang = "hi" if language == "hi" else "en"
+    dept_info = DEPARTMENT_ROUTING.get(key, DEPARTMENT_ROUTING["damaged_walking_surface"])
+    return dept_info.get(lang, dept_info["en"])
 
 
 def generate_report_draft(
@@ -84,26 +137,29 @@ def generate_report_draft(
     else:
         issue = audit.issues[issue_index]
 
-    loc = user_location.strip() if user_location and user_location.strip() else "Location not specified by citizen"
+    loc = user_location.strip() if user_location and user_location.strip() else ("स्थान दर्ज नहीं किया गया" if lang == "hi" else "Location not specified by citizen")
     priority = issue.priority_breakdown
     priority_tier = priority.priority_tier if priority else "MEDIUM"
     priority_score = priority.total_score if priority else 50.0
-    priority_explanation = (
-        f"Safety: {priority.safety_score}/40 | Accessibility: {priority.accessibility_score}/35 | Evidence: {priority.evidence_score}/25"
-        if priority else "Standard baseline score"
-    )
+    
+    if lang == "hi":
+        priority_explanation = f"खतरा: {priority.safety_score if priority else 20}/40 | रुकावट: {priority.accessibility_score if priority else 15}/35 | स्पष्टता: {priority.evidence_score if priority else 15}/25"
+    else:
+        priority_explanation = f"Safety Risk: {priority.safety_score if priority else 20}/40 | Obstruction: {priority.accessibility_score if priority else 15}/35 | Clarity: {priority.evidence_score if priority else 15}/25"
 
+    dept = get_responsible_authority(issue.issue_type, lang)
     report_id = f"REP-{datetime.now().strftime('%Y%m%d')}-{issue.issue_id}"
 
     return CivicReportDraft(
         report_id=report_id,
         audit_id=audit.audit_id,
-        issue_title=f"Civic Audit: {issue.concise_description}",
+        issue_title=issue.concise_description,
         user_location=loc,
         observed_condition=issue.concise_description,
         supporting_visual_evidence=issue.visual_evidence,
         possible_impact=issue.potential_impact,
         suggested_remediation=issue.suggested_action,
+        responsible_authority=dept,
         priority_tier=priority_tier,
         priority_score=priority_score,
         priority_explanation=priority_explanation,
@@ -115,12 +171,12 @@ def generate_report_draft(
 
 
 def export_report_as_markdown(report: CivicReportDraft) -> str:
-    """Formats the report into clean, readable GitHub-flavored Markdown."""
+    """Formats the report into clean, readable Markdown."""
     t = TEMPLATES.get(report.language, TEMPLATES["en"])
     unknowns_str = (
         "\n".join([f"- {u}" for u in report.uncertainties_and_unknowns])
         if report.uncertainties_and_unknowns
-        else "- None noted. Physical evidence was clear in photograph."
+        else ("- कोई अस्पष्टता नहीं मिली।" if report.language == "hi" else "- None noted. Visual evidence was clear.")
     )
 
     return f"""# {t['header']}
@@ -134,6 +190,9 @@ def export_report_as_markdown(report: CivicReportDraft) -> str:
 
 ### 📍 {t['location_label']}
 **{report.user_location}**
+
+### 🏛️ {t['authority_label']}
+**{report.responsible_authority}**
 
 ### ⚠️ {t['issue_label']}
 **{report.issue_title}**
@@ -159,17 +218,17 @@ def export_report_as_markdown(report: CivicReportDraft) -> str:
 {unknowns_str}
 
 ---
-*{t['audit_meta_label']}:* `{report.audit_id}` | *Report Reference:* `{report.report_id}` | *Timestamp:* `{report.created_at}`
+*{t['audit_meta_label']}:* `{report.audit_id}` | *Report Reference:* `{report.report_id}` | *Date:* `{report.created_at[:10]}`
 """
 
 
 def export_report_as_text(report: CivicReportDraft) -> str:
-    """Formats the report into plain text suitable for copying into municipal web forms or emails."""
+    """Formats the report into plain text suitable for copying into municipal web forms or WhatsApp."""
     t = TEMPLATES.get(report.language, TEMPLATES["en"])
     unknowns_str = (
         ", ".join(report.uncertainties_and_unknowns)
         if report.uncertainties_and_unknowns
-        else "None noted"
+        else ("कोई नहीं" if report.language == "hi" else "None noted")
     )
 
     lines = [
@@ -178,20 +237,20 @@ def export_report_as_text(report: CivicReportDraft) -> str:
         t["sub_header"],
         "================================================================================",
         "",
-        f"[DISCLAIMER]: {report.disclaimer}",
+        f"[DISCLAIMER / सूचना]: {report.disclaimer}",
         "",
-        f"{t['location_label']}: {report.user_location}",
-        f"Subject / Barrier: {report.issue_title}",
-        f"{t['condition_label']}: {report.observed_condition}",
-        f"{t['evidence_label']}: {report.supporting_visual_evidence}",
-        f"{t['impact_label']}: {report.possible_impact}",
-        f"{t['remediation_label']}: {report.suggested_remediation}",
-        f"{t['priority_label']}: {report.priority_tier} ({report.priority_score}/100)",
-        f"Scoring Breakdown: {report.priority_explanation}",
-        f"{t['uncertainties_label']}: {unknowns_str}",
+        f"📍 {t['location_label']}: {report.user_location}",
+        f"🏛️ {t['authority_label']}: {report.responsible_authority}",
+        f"⚠️ {t['issue_label']}: {report.issue_title}",
+        f"🔍 {t['condition_label']}: {report.observed_condition}",
+        f"📸 {t['evidence_label']}: {report.supporting_visual_evidence}",
+        f"👥 {t['impact_label']}: {report.possible_impact}",
+        f"🛠️ {t['remediation_label']}: {report.suggested_remediation}",
+        f"📊 {t['priority_label']}: {report.priority_tier} ({report.priority_score}/100)",
+        f"Scoring / विवरण: {report.priority_explanation}",
+        f"❓ {t['uncertainties_label']}: {unknowns_str}",
         "",
         f"Audit Reference: {report.audit_id} | Report ID: {report.report_id}",
-        f"Date: {report.created_at}",
         "================================================================================",
     ]
     return "\n".join(lines)
@@ -200,3 +259,19 @@ def export_report_as_text(report: CivicReportDraft) -> str:
 def export_report_as_json(report: CivicReportDraft) -> str:
     """Exports the report as structured JSON."""
     return report.model_dump_json(indent=2)
+
+
+def build_whatsapp_share_url(report: CivicReportDraft) -> str:
+    """Builds a WhatsApp click-to-chat URL with pre-filled civic report summary."""
+    text = (
+        f"🚨 *Civic Issue Report via CivicLens AI*\n\n"
+        f"📍 *Location:* {report.user_location}\n"
+        f"⚠️ *Problem:* {report.issue_title}\n"
+        f"🏛️ *Dept:* {report.responsible_authority}\n"
+        f"👥 *Impact:* {report.possible_impact}\n"
+        f"🛠️ *Requested Fix:* {report.suggested_remediation}\n"
+        f"📊 *Priority:* {report.priority_tier} ({report.priority_score}/100)\n\n"
+        f"_Kindly address this pedestrian hazard._"
+    )
+    encoded = urllib.parse.quote(text)
+    return f"https://api.whatsapp.com/send?text={encoded}"

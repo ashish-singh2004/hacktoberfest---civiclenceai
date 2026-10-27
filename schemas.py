@@ -164,6 +164,7 @@ class CivicReportDraft(BaseModel):
     priority_score: float
     priority_explanation: str
     uncertainties_and_unknowns: List[str]
+    responsible_authority: str = "Public Works Department (PWD) / Municipal Maintenance"
     disclaimer: str
     created_at: str
     language: str = "en"
