@@ -47,6 +47,35 @@ st.set_page_config(
 # Custom Accessible Light CSS Theme
 CUSTOM_CSS = """
 <style>
+    /* Enforce light background & high-contrast dark text everywhere */
+    .stApp {
+        background-color: #f8fafc !important;
+        color: #0f172a !important;
+    }
+    
+    [data-testid="stSidebar"] {
+        background-color: #ffffff !important;
+        border-right: 1px solid #e2e8f0 !important;
+    }
+    
+    [data-testid="stSidebar"] * {
+        color: #1e293b !important;
+    }
+
+    /* Input boxes, text areas & select boxes */
+    .stTextInput input, .stTextArea textarea, .stSelectbox div {
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+        border: 1px solid #cbd5e1 !important;
+    }
+
+    /* Expanders & card containers */
+    [data-testid="stExpander"] {
+        background-color: #ffffff !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 8px !important;
+    }
+
     /* Clean civic typography & accessible contrast */
     .main {
         background-color: #f8fafc;

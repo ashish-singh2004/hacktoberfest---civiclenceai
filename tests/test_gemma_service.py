@@ -59,3 +59,33 @@ def test_demo_audit_cases_structure():
         assert c.is_demo_data is True
         for iss in c.issues:
             assert iss.priority_breakdown is not None
+
+
+def test_normalize_audit_dict_with_list_of_issues():
+    from gemma_service import _normalize_audit_dict
+    raw_list = [
+        {
+            "issue_id": "ISS-01",
+            "issue_type": "open_drainage_pothole",
+            "concise_description": "Pothole in asphalt",
+            "visual_evidence": "Dark hole in pavement",
+            "potential_impact": "Tripping risk",
+            "confidence_score": "0.92",
+            "affected_groups": "wheelchair_users, elderly",
+            "unknowns": "True depth unknown",
+            "persona_impacts": [
+                {"wheelchair_users": "Cannot traverse safely"}
+            ]
+        }
+    ]
+    norm = _normalize_audit_dict(raw_list, "gemma-4-26b-a4b-it")
+    assert isinstance(norm, dict)
+    assert norm["has_barriers"] is True
+    assert len(norm["issues"]) == 1
+    iss = norm["issues"][0]
+    assert iss["issue_id"] == "ISS-01"
+    assert iss["confidence_score"] == 0.92
+    assert "wheelchair_users" in iss["affected_groups"]
+    assert iss["unknowns"] == ["True depth unknown"]
+    assert iss["persona_impacts"]["wheelchair_users"] == "Cannot traverse safely"
+
