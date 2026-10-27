@@ -275,3 +275,156 @@ def build_whatsapp_share_url(report: CivicReportDraft) -> str:
     )
     encoded = urllib.parse.quote(text)
     return f"https://api.whatsapp.com/send?text={encoded}"
+
+
+def build_twitter_share_url(report: CivicReportDraft) -> str:
+    """Builds a Twitter/X intent URL tagging municipal authorities with civic hashtags."""
+    text = (
+        f"🚨 Civic Hazard Alert via #CivicLensAI\n"
+        f"📍 Location: {report.user_location[:40]}\n"
+        f"⚠️ Hazard: {report.issue_title[:60]}\n"
+        f"🏛️ Requesting prompt action from municipal authorities.\n"
+        f"#FixOurFootpath #AccessibilityForAll #SDG11 #SmartCities"
+    )
+    encoded = urllib.parse.quote(text)
+    return f"https://twitter.com/intent/tweet?text={encoded}"
+
+
+def build_email_mailto_url(report: CivicReportDraft) -> str:
+    """Builds a mailto URL for direct municipal grievance filing."""
+    subject = f"URGENT: Pedestrian Accessibility Grievance [{report.priority_tier}] - {report.user_location[:40]}"
+    body = export_report_as_text(report)
+    return f"mailto:commissioner@mcd.gov.in?subject={urllib.parse.quote(subject)}&body={urllib.parse.quote(body)}"
+
+
+def generate_printable_html_certificate(report: CivicReportDraft) -> str:
+    """Generates a styled, printable HTML Civic Accessibility Audit Certificate."""
+    t = TEMPLATES.get(report.language, TEMPLATES["en"])
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Civic Inspection Certificate - {report.report_id}</title>
+<style>
+    body {{
+        font-family: Arial, sans-serif;
+        margin: 40px;
+        color: #1e293b;
+        background: #ffffff;
+    }}
+    .cert-card {{
+        border: 2px solid #2563eb;
+        border-radius: 12px;
+        padding: 30px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    }}
+    .header {{
+        border-bottom: 2px solid #e2e8f0;
+        padding-bottom: 15px;
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }}
+    .header h1 {{
+        color: #1e3a8a;
+        font-size: 22px;
+        margin: 0;
+    }}
+    .badge {{
+        background: #ef4444;
+        color: white;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-weight: bold;
+        font-size: 13px;
+    }}
+    .grid {{
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+        margin-bottom: 20px;
+    }}
+    .field {{
+        background: #f8fafc;
+        padding: 12px;
+        border-radius: 6px;
+        border: 1px solid #e2e8f0;
+    }}
+    .field-title {{
+        font-weight: bold;
+        font-size: 12px;
+        color: #64748b;
+        text-transform: uppercase;
+        margin-bottom: 4px;
+    }}
+    .field-value {{
+        font-size: 14px;
+        color: #0f172a;
+    }}
+    .footer {{
+        border-top: 1px solid #e2e8f0;
+        padding-top: 15px;
+        margin-top: 25px;
+        font-size: 11px;
+        color: #64748b;
+        text-align: center;
+    }}
+    @media print {{
+        body {{ margin: 0; }}
+        .cert-card {{ border: 1px solid #000; box-shadow: none; }}
+    }}
+</style>
+</head>
+<body>
+<div class="cert-card">
+    <div class="header">
+        <div>
+            <h1>🏙️ {t['header']}</h1>
+            <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">Official Citizen Accessibility Audit Certificate</p>
+        </div>
+        <div class="badge">{report.priority_tier} PRIORITY</div>
+    </div>
+
+    <div class="grid">
+        <div class="field">
+            <div class="field-title">📍 Location</div>
+            <div class="field-value">{report.user_location}</div>
+        </div>
+        <div class="field">
+            <div class="field-title">🏛️ Responsible Authority</div>
+            <div class="field-value">{report.responsible_authority}</div>
+        </div>
+        <div class="field">
+            <div class="field-title">⚠️ Identified Barrier</div>
+            <div class="field-value">{report.issue_title}</div>
+        </div>
+        <div class="field">
+            <div class="field-title">📊 Priority Score</div>
+            <div class="field-value"><strong>{report.priority_score} / 100</strong> ({report.priority_tier})</div>
+        </div>
+    </div>
+
+    <div class="field" style="margin-bottom: 15px;">
+        <div class="field-title">📸 Visual Evidence Grounding</div>
+        <div class="field-value">{report.supporting_visual_evidence}</div>
+    </div>
+
+    <div class="field" style="margin-bottom: 15px;">
+        <div class="field-title">👥 Pedestrian & Disability Impact</div>
+        <div class="field-value">{report.possible_impact}</div>
+    </div>
+
+    <div class="field" style="margin-bottom: 15px;">
+        <div class="field-title">🛠️ Requested Municipal Remediation</div>
+        <div class="field-value">{report.suggested_remediation}</div>
+    </div>
+
+    <div class="footer">
+        <p><strong>Report Reference:</strong> {report.report_id} | <strong>Audit ID:</strong> {report.audit_id} | <strong>Generated:</strong> {report.created_at[:10]}</p>
+        <p>Powered by Gemma 4 Multimodal AI &bull; Supporting UN SDG 11 (Sustainable Cities) &bull; Rights of Persons with Disabilities Act (RPwD 2016)</p>
+    </div>
+</div>
+</body>
+</html>"""
+

@@ -60,3 +60,53 @@ def test_department_routing_all_keys():
         dept_hi = get_responsible_authority(k, "hi")
         assert len(dept_en) > 5
         assert len(dept_hi) > 5
+
+
+def test_repair_estimator():
+    from repair_estimator import get_repair_estimate
+    est_en = get_repair_estimate("open_drainage_pothole", "CRITICAL", "en")
+    assert "₹" in est_en["cost"]
+    assert "Within" in est_en["sla"]
+    assert len(est_en["materials"]) > 0
+
+    est_hi = get_repair_estimate("broken_footpath", "HIGH", "hi")
+    assert "घंटे के अंदर" in est_hi["sla"]
+    assert "पेवर ब्लॉक" in ", ".join(est_hi["materials"])
+
+
+def test_share_channels_and_html_certificate():
+    from schemas import CivicReportDraft
+    from report_generator import build_twitter_share_url, build_email_mailto_url, generate_printable_html_certificate
+
+    draft = CivicReportDraft(
+        report_id="REP-TEST-123",
+        audit_id="AUD-TEST-123",
+        issue_title="Deep Pothole on Main Road",
+        user_location="Sector 14 Metro",
+        observed_condition="Severe 40cm cavity",
+        supporting_visual_evidence="Cavity with asphalt debris",
+        possible_impact="Tripping hazard for elderly",
+        suggested_remediation="Bitumen patch",
+        responsible_authority="Public Works Department",
+        priority_tier="CRITICAL",
+        priority_score=88.0,
+        priority_explanation="High risk",
+        uncertainties_and_unknowns=[],
+        disclaimer="Draft only",
+        created_at="2026-10-27T12:00:00Z",
+        language="en"
+    )
+
+    tw = build_twitter_share_url(draft)
+    assert "twitter.com/intent/tweet" in tw
+    assert "CivicLensAI" in tw
+
+    email = build_email_mailto_url(draft)
+    assert "mailto:commissioner@mcd.gov.in" in email
+    assert "Sector%2014%20Metro" in email
+
+    html_cert = generate_printable_html_certificate(draft)
+    assert "<!DOCTYPE html>" in html_cert
+    assert "Civic Inspection Certificate" in html_cert
+    assert "REP-TEST-123" in html_cert
+

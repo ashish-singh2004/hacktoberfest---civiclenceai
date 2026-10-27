@@ -39,11 +39,16 @@ from report_generator import (
     export_report_as_text,
     export_report_as_json,
     build_whatsapp_share_url,
+    build_twitter_share_url,
+    build_email_mailto_url,
+    generate_printable_html_certificate,
     get_responsible_authority,
 )
 from demo_data import get_demo_audit_cases
 from visual_overlay import draw_obstacle_overlay
 from audio_service import generate_audio_briefing, build_spoken_summary
+from repair_estimator import get_repair_estimate
+
 
 # ------------------------------------------------------------------------------
 # 1. Page Configuration & Enforced Light Theme
@@ -201,13 +206,67 @@ CUSTOM_CSS = """
         background-color: #25d366;
         color: white !important;
         text-decoration: none;
-        padding: 8px 16px;
+        padding: 9px 16px;
         border-radius: 6px;
         font-weight: 600;
         font-size: 13px;
         text-align: center;
         width: 100%;
         margin-top: 6px;
+    }
+    .tweet-button {
+        display: inline-block;
+        background-color: #0284c7;
+        color: white !important;
+        text-decoration: none;
+        padding: 9px 16px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 13px;
+        text-align: center;
+        width: 100%;
+        margin-top: 6px;
+    }
+    .email-button {
+        display: inline-block;
+        background-color: #4f46e5;
+        color: white !important;
+        text-decoration: none;
+        padding: 9px 16px;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 13px;
+        text-align: center;
+        width: 100%;
+        margin-top: 6px;
+    }
+    .simple-summary-card {
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        border-left: 5px solid #16a34a;
+        border-radius: 8px;
+        padding: 14px 16px;
+        margin-bottom: 14px;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+    }
+    .estimate-box {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-left: 5px solid #2563eb;
+        border-radius: 8px;
+        padding: 14px 16px;
+        margin-top: 12px;
+        margin-bottom: 14px;
+    }
+    .compliance-pill {
+        display: inline-block;
+        background: #fee2e2;
+        color: #991b1b;
+        font-size: 11.5px;
+        font-weight: 700;
+        padding: 3px 10px;
+        border-radius: 20px;
+        border: 1px solid #f87171;
     }
 </style>
 """
@@ -501,18 +560,52 @@ if menu_selection == txt["nav_analyze"]:
             for idx, issue in enumerate(current_audit.issues):
                 priority = issue.priority_breakdown
                 tier_badge = render_tier_badge(priority.priority_tier if priority else "LOW", st.session_state["lang"])
+                est = get_repair_estimate(issue.issue_type, priority.priority_tier if priority else "HIGH", st.session_state["lang"])
 
                 with st.expander(f"⚠️ {issue.concise_description}", expanded=True):
                     st.markdown(f"**Urgency / स्तर:** {tier_badge} | **Confidence:** `{int(issue.confidence_score * 100)}%`", unsafe_allow_html=True)
 
                     dept = get_responsible_authority(issue.issue_type, st.session_state["lang"])
-                    st.markdown(f"**🏛️ Responsible Dept / जिम्मेदार विभाग:** `{dept}`")
-                    st.markdown(f"**📸 Visible Evidence / सबूत:** {issue.visual_evidence}")
-                    st.markdown(f"**👥 Possible Impact / प्रभाव:** {issue.potential_impact}")
-                    st.markdown(f"**🛠️ Recommended Action / सुझाव:** {issue.suggested_action}")
 
-                    # AUDIO NARRATION FOR BLIND / VISUALLY IMPAIRED
-                    st.markdown("---")
+                    # 1. SIMPLE PLAIN CITIZEN SUMMARY (आसान भाषा में सारांश)
+                    if st.session_state["lang"] == "hi":
+                        st.markdown(f"""
+                        <div class="simple-summary-card">
+                            <h4 style="margin: 0 0 8px 0; color: #166534;">💡 आसान सारांश (Citizen Quick Summary)</h4>
+                            <p style="margin: 0 0 4px 0;">🛑 <strong>समस्या:</strong> {issue.concise_description}</p>
+                            <p style="margin: 0 0 4px 0;">⚠️ <strong>खतरा:</strong> {issue.potential_impact}</p>
+                            <p style="margin: 0 0 4px 0;">🛠️ <strong>तुरंत क्या करें:</strong> {issue.suggested_action}</p>
+                            <p style="margin: 0;">🏛️ <strong>किसे शिकायत भेजें:</strong> <strong>{dept}</strong></p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"""
+                        <div class="simple-summary-card">
+                            <h4 style="margin: 0 0 8px 0; color: #166534;">💡 Simple Citizen Summary (In Plain Words)</h4>
+                            <p style="margin: 0 0 4px 0;">🛑 <strong>The Issue:</strong> {issue.concise_description}</p>
+                            <p style="margin: 0 0 4px 0;">⚠️ <strong>Why It's Dangerous:</strong> {issue.potential_impact}</p>
+                            <p style="margin: 0 0 4px 0;">🛠️ <strong>Recommended Fix:</strong> {issue.suggested_action}</p>
+                            <p style="margin: 0;">🏛️ <strong>Responsible Authority:</strong> <strong>{dept}</strong></p>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                    # 2. MUNICIPAL REPAIR COST & SLA ESTIMATOR (CPWD Schedule of Rates)
+                    st.markdown(f"""
+                    <div class="estimate-box">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <strong style="color: #1e3a8a; font-size: 14px;">🏗️ {'स्मार्ट मरम्मत अनुमान (Civil Repair Estimate)' if st.session_state['lang'] == 'hi' else 'Smart Civil Repair & Cost Estimate'}</strong>
+                            <span class="compliance-pill">{'RPwD अधिनियम 2016 उल्लंघन' if st.session_state['lang'] == 'hi' else 'RPwD Act 2016 Non-Compliant'}</span>
+                        </div>
+                        <div style="font-size: 13px; line-height: 1.6; color: #334155;">
+                            <div>💵 <strong>{'अनुमानित खर्च:' if st.session_state['lang'] == 'hi' else 'Estimated Budget:'}</strong> {est['cost']}</div>
+                            <div>⏱️ <strong>{'समाधान समय (SLA):' if st.session_state['lang'] == 'hi' else 'Resolution Timeframe:'}</strong> {est['sla']}</div>
+                            <div>🛠️ <strong>{'जरूरी सामग्री:' if st.session_state['lang'] == 'hi' else 'Materials Needed:'}</strong> {', '.join(est['materials'])}</div>
+                            <div>👷 <strong>{'जिम्मेदार दल:' if st.session_state['lang'] == 'hi' else 'Maintenance Crew:'}</strong> {est['crew']}</div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    # 3. AUDIO NARRATION FOR BLIND / VISUALLY IMPAIRED
                     st.markdown(f"#### {txt['audio_title']}")
                     spoken_text = build_spoken_summary(issue.concise_description, issue.potential_impact, st.session_state["lang"])
                     audio_bytes = generate_audio_briefing(spoken_text, st.session_state["lang"])
@@ -521,7 +614,7 @@ if menu_selection == txt["nav_analyze"]:
                     else:
                         st.caption("Audio narration ready. (Internet required for voice synthesis)")
 
-                    # PERSONA IMPACT CARDS
+                    # 4. PERSONA IMPACT CARDS
                     st.markdown("#### " + txt["persona_header"])
                     p = issue.persona_impacts
                     p_col1, p_col2 = st.columns(2)
@@ -552,7 +645,7 @@ if menu_selection == txt["nav_analyze"]:
                         </div>
                         """, unsafe_allow_html=True)
 
-                    # EXPLAINABLE PRIORITY SCORE METER
+                    # 5. EXPLAINABLE PRIORITY SCORE METER
                     if priority:
                         st.markdown("#### " + txt["priority_header"])
                         st.progress(int(priority.total_score), text=f"Priority Score: {priority.total_score} / 100")
@@ -565,7 +658,7 @@ if menu_selection == txt["nav_analyze"]:
                         with s_col3:
                             st.metric("Photo Clarity (0-25)", f"{priority.evidence_score}")
 
-    # SECTION 3: 1-CLICK COMPLAINT LETTER & WHATSAPP SHARING
+    # SECTION 3: 1-CLICK COMPLAINT LETTER & MULTI-CHANNEL SHARING
     if current_audit and current_audit.issues:
         st.markdown("---")
         st.subheader("📝 3. " + txt["report_header"])
@@ -581,6 +674,9 @@ if menu_selection == txt["nav_analyze"]:
         txt_content = export_report_as_text(draft)
         json_content = export_report_as_json(draft)
         wa_url = build_whatsapp_share_url(draft)
+        tw_url = build_twitter_share_url(draft)
+        mail_url = build_email_mailto_url(draft)
+        cert_html = generate_printable_html_certificate(draft)
 
         col_rep1, col_rep2 = st.columns([3, 2], gap="large")
 
@@ -588,16 +684,28 @@ if menu_selection == txt["nav_analyze"]:
             editable_report = st.text_area(
                 "Editable Complaint Text (Feel free to edit before sending):",
                 value=txt_content,
-                height=300
+                height=320
             )
 
         with col_rep2:
-            st.markdown("#### 🚀 1-Click Action & Share")
-            st.caption("Send this issue directly to ward officials or your local resident group:")
+            st.markdown("#### 🚀 1-Click Citizen Action")
+            st.caption("Send this issue directly to authorities or social media for prompt action:")
 
-            # WhatsApp Share Button
+            # Multi-channel dispatch buttons
             st.markdown(f'<a href="{wa_url}" target="_blank" class="wa-button">📲 Share on WhatsApp (वॉट्सऐप पर भेजें)</a>', unsafe_allow_html=True)
+            st.markdown(f'<a href="{tw_url}" target="_blank" class="tweet-button">🐦 Post Alert on Twitter / X (ट्विटर पर पोस्ट करें)</a>', unsafe_allow_html=True)
+            st.markdown(f'<a href="{mail_url}" target="_blank" class="email-button">✉️ Email Ward Official (अधिकारी को ईमेल करें)</a>', unsafe_allow_html=True)
 
+            st.markdown("---")
+            st.caption("📥 Download Official Copies:")
+
+            st.download_button(
+                label="🖨️ Download Printable Inspection Certificate (.html)",
+                data=cert_html,
+                file_name=f"Certificate_{draft.report_id}.html",
+                mime="text/html",
+                use_container_width=True
+            )
             st.download_button(
                 label=txt["btn_download_txt"],
                 data=editable_report,
@@ -619,6 +727,7 @@ if menu_selection == txt["nav_analyze"]:
                 mime="application/json",
                 use_container_width=True
             )
+
 
 
 # ------------------------------------------------------------------------------
